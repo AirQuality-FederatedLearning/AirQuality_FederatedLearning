@@ -1,0 +1,10 @@
+model:
+  type: "GRU"
+  hidden_units: 16
+  learning_rate: 0.001
+  epochs: 5
+  batch_size: 32
+
+data:
+  csv_path: "new_delhi_aqi.csv"
+  # other data-related configs if needed

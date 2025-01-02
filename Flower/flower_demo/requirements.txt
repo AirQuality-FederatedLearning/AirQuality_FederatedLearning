@@ -1,0 +1,5 @@
+flwr>=1.4.0
+tensorflow>=2.9.0
+pandas
+numpy
+scikit-learn

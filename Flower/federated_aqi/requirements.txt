@@ -1,0 +1,8 @@
+
+flower
+hydra-core
+ray
+numpy
+pandas
+scikit-learn
+tensorflow
