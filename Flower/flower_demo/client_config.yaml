@@ -6,5 +6,6 @@ model:
   batch_size: 32
 
 data:
-  csv_path: "new_delhi_aqi.csv"
-  # other data-related configs if needed
+  csv_paths:
+    delhi: "cpcb_delhi_aqi.xlsx"
+    covai: "cpcb_covai_aqi.xlsx"

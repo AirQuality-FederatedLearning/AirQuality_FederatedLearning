@@ -62,7 +62,7 @@ class TimeSeriesClient(NumPyClient):
             batch_size=self.batch_size,
             verbose=0
         )
-        self.model.save("client_model.h5")
+        self.model.save("client_model2.h5")
 
         return self.get_parameters(config), len(self.X_train), {}
 
