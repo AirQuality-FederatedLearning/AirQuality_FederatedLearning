@@ -1,0 +1,8 @@
+model:
+  hidden_units: 16
+  learning_rate: 0.001
+  epochs: 1
+  batch_size: 16
+  num_outputs: 15
+
+output_dir: "./client_outputs"
