@@ -9,6 +9,17 @@ import os
 from sklearn.preprocessing import MinMaxScaler
 
 
+def parse_dataset_name(filename):
+    """
+    Extracts the interval, year, and place from the dataset filename.
+    """
+    parts = filename.split('_')
+    interval = parts[2]
+    year = parts[3]
+    place = ' '.join(parts[7:-2])
+    return {'interval': interval, 'year': year, 'place': place}
+
+
 def build_hybrid_mlp_lstm(input_dim, learning_rate):
     """
     Build the hybrid MLP-LSTM model.
@@ -19,29 +30,30 @@ def build_hybrid_mlp_lstm(input_dim, learning_rate):
     mlp = tf.keras.layers.Dense(5, activation="tanh")(mlp)
     mlp = tf.keras.layers.Dense(1)(mlp)
     mlp_output = tf.keras.layers.Reshape((1, 1))(mlp)
-    
+
     # LSTM Block
     lstm = tf.keras.layers.LSTM(128, return_sequences=False)(inputs)
     lstm = tf.keras.layers.Dense(100, activation="tanh")(lstm)
     lstm_output = tf.keras.layers.Dense(1)(lstm)
-    
+
     # Combine
     combined = tf.keras.layers.Concatenate(axis=-1)([mlp_output, tf.keras.layers.Reshape((1, 1))(lstm_output)])
     combined_output = tf.keras.layers.Dense(1)(combined)
-    
+
     model = tf.keras.Model(inputs=inputs, outputs=combined_output)
     model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss="mse", metrics=["mae"])
     return model
 
 
 class TimeSeriesClient(NumPyClient):
-    def __init__(self, data, input_dim, learning_rate, epochs, batch_size, output_dir):
+    def __init__(self, data, input_dim, learning_rate, epochs, batch_size, output_dir, dataset_path):
         super().__init__()
         self.epochs = epochs
         self.batch_size = batch_size
         self.output_dir = output_dir
         self.data = data
         self.input_dim = input_dim
+        self.dataset_path = dataset_path
 
         # Build the model
         self.model = build_hybrid_mlp_lstm(input_dim=input_dim, learning_rate=learning_rate)
@@ -58,7 +70,6 @@ class TimeSeriesClient(NumPyClient):
         X_train, y_train = self.data["train"]
         self.model.fit(X_train, y_train, epochs=self.epochs, batch_size=self.batch_size, verbose=0)
         return self.get_parameters(config), len(X_train), {}
-
     def evaluate(self, parameters, config):
         # Set model parameters
         self.set_parameters(parameters, config)
@@ -85,40 +96,36 @@ class TimeSeriesClient(NumPyClient):
         # Calculate MSE for each sample
         mse_values = np.square(y_test - predictions)
 
-        # Create a DataFrame with predictions, actual values, and MSE
-        results_df = pd.DataFrame({
-            "Actual": y_test,
-            "Predicted": predictions,
-            "MSE": mse_values,
-        })
+        # Assuming pollutants is a list of the columns you're predicting
+        pollutants = ["PM2.5 (µg/m³)", "PM10 (µg/m³)", "NO (µg/m³)", "NO2 (µg/m³)", "SO2 (µg/m³)", "CO (mg/m³)", "Ozone (µg/m³)"]
 
-        # Save to a CSV file
-        csv_path = os.path.join(self.output_dir, "evaluation_results.csv")
+        # Update results with MSE for each pollutant
+        results = {
+            "Loss": loss,
+            "MAE": mae,
+        }
+
+        # Add MSE for each pollutant
+        for i, pollutant in enumerate(pollutants):
+            if i < len(mse_values):
+                results[f"{pollutant} MSE"] = mse_values[i]
+
+        # Create DataFrame for logging
+        results_df = pd.DataFrame(results, index=[0])
+
+        # Extract place from the dataset name
+        dataset_name = os.path.basename(self.dataset_path)
+        dataset_info = parse_dataset_name(dataset_name)
+        place = dataset_info['place']
+
+        # Save results to a CSV file for each place
+        csv_filename = f"{place}_evaluation_results.csv"
+        csv_path = os.path.join(self.output_dir, csv_filename)
         results_df.to_csv(csv_path, index=False)
-        print(f"Evaluation results saved at {csv_path}")
 
-        # Return the loss, number of samples, and metrics (e.g., MAE)
+        print(f"Evaluation results for {place} saved at {csv_path}")
+
         return float(loss), len(X_test), {"mae": float(mae)}
-
-
-
-
-def fit(self, parameters, config):
-    # Set model parameters
-    self.set_parameters(parameters, config)
-    
-    # Train the model
-    X_train, y_train = self.data["train"]
-    self.model.fit(X_train, y_train, epochs=self.epochs, batch_size=self.batch_size, verbose=0)
-    
-    # Save the trained local model
-    model_path = os.path.join(self.output_dir, "local_model.h5")
-    self.model.save(model_path)
-    print(f"Local model saved at {model_path}")
-    
-    # Return updated parameters and sample count
-    return self.get_parameters(config), len(X_train), {}
-
 
 def preprocess_data(dataset_path):
     df = pd.read_csv(dataset_path)
@@ -137,7 +144,7 @@ def preprocess_data(dataset_path):
     train_data, test_data = values_scaled[:train_size], values_scaled[train_size:]
     X_train, y_train = train_data[:-1], train_data[1:]
     X_test, y_test = test_data[:-1], test_data[1:]
-    
+
     # Reshape for LSTM input
     X_train = np.expand_dims(X_train, axis=1)
     X_test = np.expand_dims(X_test, axis=1)
@@ -162,7 +169,7 @@ def main():
     data, input_dim = preprocess_data(args.dataset)
 
     # Initialize and start the client
-    client = TimeSeriesClient(data=data, input_dim=input_dim, learning_rate=learning_rate, epochs=epochs, batch_size=batch_size, output_dir=output_dir)
+    client = TimeSeriesClient(data=data, input_dim=input_dim, learning_rate=learning_rate, epochs=epochs, batch_size=batch_size, output_dir=output_dir, dataset_path=args.dataset)
     fl.client.start_numpy_client(server_address="127.0.0.1:8080", client=client)
 
 
