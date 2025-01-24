@@ -1,0 +1,4 @@
+Best Model: GRU Model 5
+Architecture: [128, 128, 64]
+MSE: 84.75233058145831
+Predictions: [34.247845 36.480465 11.9228   10.705191 10.996127]
