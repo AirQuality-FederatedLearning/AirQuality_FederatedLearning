@@ -93,22 +93,21 @@ class TimeSeriesClient(NumPyClient):
             predictions = predictions[:min_len]
             y_test = y_test[:min_len]
 
-        # Calculate MSE for each sample
-        mse_values = np.square(y_test - predictions)
-
         # Assuming pollutants is a list of the columns you're predicting
         pollutants = ["PM2.5 (µg/m³)", "PM10 (µg/m³)", "NO (µg/m³)", "NO2 (µg/m³)", "SO2 (µg/m³)", "CO (mg/m³)", "Ozone (µg/m³)"]
 
-        # Update results with MSE for each pollutant
+        # Prepare the results dictionary
         results = {
             "Loss": loss,
             "MAE": mae,
         }
 
-        # Add MSE for each pollutant
+        # Add columns for predicted, actual, and MSE for each pollutant
         for i, pollutant in enumerate(pollutants):
-            if i < len(mse_values):
-                results[f"{pollutant} MSE"] = mse_values[i]
+            if i < len(predictions):
+                results[f"{pollutant} Predicted"] = predictions[i]
+                results[f"{pollutant} Actual"] = y_test[i]
+                results[f"{pollutant} MSE"] = np.square(y_test[i] - predictions[i])
 
         # Create DataFrame for logging
         results_df = pd.DataFrame(results, index=[0])
