@@ -1,0 +1,1 @@
+python client.py --config client_config.yaml --dataset ..\Dataset_Dehli\Raw_data_15Min_2017_site_117_ITO_Delhi_CPCB_15Min.csv --idx 0"
