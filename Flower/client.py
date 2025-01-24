@@ -60,10 +60,64 @@ class TimeSeriesClient(NumPyClient):
         return self.get_parameters(config), len(X_train), {}
 
     def evaluate(self, parameters, config):
+        # Set model parameters
         self.set_parameters(parameters, config)
+
+        # Get test data
         X_test, y_test = self.data["test"]
+
+        # Evaluate the model
         loss, mae = self.model.evaluate(X_test, y_test, verbose=0)
+
+        # Get predictions
+        predictions = self.model.predict(X_test).flatten()
+
+        # Handle shape mismatch
+        if len(predictions.shape) == 1 and len(y_test.shape) == 2:
+            y_test = y_test[:, 0]  # Use only the first column of y_test
+
+        # Ensure shapes match
+        if len(predictions) != len(y_test):
+            min_len = min(len(predictions), len(y_test))
+            predictions = predictions[:min_len]
+            y_test = y_test[:min_len]
+
+        # Calculate MSE for each sample
+        mse_values = np.square(y_test - predictions)
+
+        # Create a DataFrame with predictions, actual values, and MSE
+        results_df = pd.DataFrame({
+            "Actual": y_test,
+            "Predicted": predictions,
+            "MSE": mse_values,
+        })
+
+        # Save to a CSV file
+        csv_path = os.path.join(self.output_dir, "evaluation_results.csv")
+        results_df.to_csv(csv_path, index=False)
+        print(f"Evaluation results saved at {csv_path}")
+
+        # Return the loss, number of samples, and metrics (e.g., MAE)
         return float(loss), len(X_test), {"mae": float(mae)}
+
+
+
+
+def fit(self, parameters, config):
+    # Set model parameters
+    self.set_parameters(parameters, config)
+    
+    # Train the model
+    X_train, y_train = self.data["train"]
+    self.model.fit(X_train, y_train, epochs=self.epochs, batch_size=self.batch_size, verbose=0)
+    
+    # Save the trained local model
+    model_path = os.path.join(self.output_dir, "local_model.h5")
+    self.model.save(model_path)
+    print(f"Local model saved at {model_path}")
+    
+    # Return updated parameters and sample count
+    return self.get_parameters(config), len(X_train), {}
 
 
 def preprocess_data(dataset_path):
