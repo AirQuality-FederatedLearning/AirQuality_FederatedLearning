@@ -4,7 +4,7 @@ REM --------------------------------------------------
 REM 1) Activate the environment and launch the server
 REM --------------------------------------------------
 echo Starting the FL server...
-start cmd /k "call venv\Scripts\activate && cd Flower && python server.py"
+start cmd /k "call venv\Scripts\activate && cd Flower && python server.py  --rounds 10 --save_dir  './saved_models"
 
 REM --------------------------------------------------
 REM 2) Launch each client on a single line

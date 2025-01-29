@@ -8,26 +8,48 @@ import tensorflow as tf
 import os
 from sklearn.preprocessing import MinMaxScaler
 
+##############################################################################
+# 1) Utilities: parse_dataset_name, model builder, etc.                     #
+##############################################################################
+
 def parse_dataset_name(filename):
+    """
+    Extract some metadata from the dataset name. 
+    Adjust to suit your naming convention as needed.
+    Example filename structure: 
+      'Air_Quality_interval_1_year_2022_something_something_dataset.csv'
+    """
     parts = filename.split('_')
-    interval = parts[2]
-    year = parts[3]
-    place = ' '.join(parts[7:-2])
+    interval = parts[2]  # e.g. '1'
+    year = parts[3]      # e.g. '2022'
+    place = ' '.join(parts[7:-2])  # e.g. 'somewhere else'
     return {'interval': interval, 'year': year, 'place': place}
 
+
 def build_hybrid_mlp_lstm(input_dim, learning_rate):
+    """
+    Build a hybrid MLP+LSTM model that outputs 7 units 
+    (one per pollutant).
+    """
     inputs = tf.keras.Input(shape=(1, input_dim))
+    
+    # MLP branch
     mlp = tf.keras.layers.Dense(10, activation="tanh")(inputs)
     mlp = tf.keras.layers.Dense(5, activation="tanh")(mlp)
     mlp = tf.keras.layers.Dense(1)(mlp)
     mlp_output = tf.keras.layers.Reshape((1, 1))(mlp)
 
+    # LSTM branch
     lstm = tf.keras.layers.LSTM(128, return_sequences=False)(inputs)
     lstm = tf.keras.layers.Dense(100, activation="tanh")(lstm)
     lstm_output = tf.keras.layers.Dense(1)(lstm)
+    lstm_output = tf.keras.layers.Reshape((1, 1))(lstm_output)
 
-    combined = tf.keras.layers.Concatenate(axis=-1)([mlp_output, tf.keras.layers.Reshape((1, 1))(lstm_output)])
-    combined_output = tf.keras.layers.Dense(1)(combined)
+    # Combine branches
+    combined = tf.keras.layers.Concatenate(axis=-1)([mlp_output, lstm_output])
+    
+    # Final Dense to produce 7 outputs (for 7 pollutants)
+    combined_output = tf.keras.layers.Dense(7)(combined)
 
     model = tf.keras.Model(inputs=inputs, outputs=combined_output)
     model.compile(
@@ -37,8 +59,21 @@ def build_hybrid_mlp_lstm(input_dim, learning_rate):
     )
     return model
 
+
+##############################################################################
+# 2) Client Class Definition                                                 #
+##############################################################################
 class TimeSeriesClient(NumPyClient):
-    def __init__(self, data, input_dim, learning_rate, epochs, batch_size, output_dir, dataset_path):
+    def __init__(
+        self,
+        data,
+        input_dim,
+        learning_rate,
+        epochs,
+        batch_size,
+        output_dir,
+        dataset_path
+    ):
         super().__init__()
         self.epochs = epochs
         self.batch_size = batch_size
@@ -46,7 +81,13 @@ class TimeSeriesClient(NumPyClient):
         self.data = data
         self.input_dim = input_dim
         self.dataset_path = dataset_path
-        self.model = build_hybrid_mlp_lstm(input_dim=input_dim, learning_rate=learning_rate)
+
+        # Build the same model architecture
+        self.model = build_hybrid_mlp_lstm(
+            input_dim=input_dim,
+            learning_rate=learning_rate
+        )
+
         os.makedirs(self.output_dir, exist_ok=True)
 
     def get_parameters(self, config):
@@ -70,41 +111,57 @@ class TimeSeriesClient(NumPyClient):
         self.set_parameters(parameters, config)
         X_test, y_test = self.data["test"]
         loss, mae = self.model.evaluate(X_test, y_test, verbose=0)
-        predictions = self.model.predict(X_test)
 
-        predictions_reshaped = predictions.reshape(-1, predictions.shape[-1])
-        y_test_reshaped = y_test.reshape(-1, y_test.shape[-1])
+        predictions = self.model.predict(X_test)
+        if len(predictions.shape) == 3:
+            predictions = predictions.reshape(predictions.shape[0], predictions.shape[2])
+        if len(y_test.shape) == 3:
+            y_test = y_test.reshape(y_test.shape[0], y_test.shape[2])
 
         scaler = self.data["scaler"]
-        predictions_original = scaler.inverse_transform(predictions_reshaped)
-        y_test_original = scaler.inverse_transform(y_test_reshaped)
+        predictions_original = scaler.inverse_transform(predictions)
+        y_test_original = scaler.inverse_transform(y_test)
 
-        pollutants = ["PM2.5 (µg/m³)", "PM10 (µg/m³)", "NO (µg/m³)", "NO2 (µg/m³)", "SO2 (µg/m³)", "CO (mg/m³)", "Ozone (µg/m³)"]
+        pollutants = [
+            "PM2.5 (µg/m³)", 
+            "PM10 (µg/m³)", 
+            "NO (µg/m³)", 
+            "NO2 (µg/m³)", 
+            "SO2 (µg/m³)", 
+            "CO (mg/m³)", 
+            "Ozone (µg/m³)"
+        ]
 
-        # Generate separate CSV files for each place
         parsed_info = parse_dataset_name(os.path.basename(self.dataset_path))
         place = parsed_info['place']
 
-        os.makedirs(self.output_dir, exist_ok=True)
         rows_per_file = 15
-
         for j, pollutant in enumerate(pollutants):
-            data = []
+            data_rows = []
             for i in range(min(rows_per_file, len(predictions_original))):
-                data.append({
-                    f"{pollutant} Predicted": predictions_original[i][j] if j < predictions_original.shape[1] else None,
-                    f"{pollutant} Actual": y_test_original[i][j] if j < y_test_original.shape[1] else None,
-                    f"{pollutant} MSE": (y_test_original[i][j] - predictions_original[i][j]) ** 2 if j < predictions_original.shape[1] else None,
+                pred_val = predictions_original[i][j]
+                actual_val = y_test_original[i][j]
+                mse_val = (actual_val - pred_val) ** 2
+                data_rows.append({
+                    f"{pollutant} Predicted": pred_val,
+                    f"{pollutant} Actual": actual_val,
+                    f"{pollutant} MSE": mse_val
                 })
-
-            # Save each pollutant's data in a separate CSV file
-            df = pd.DataFrame(data)
-            csv_path = os.path.join(self.output_dir, f"{place}_{pollutant.replace(' ', '_').replace('/', '_')}.csv")
+            df = pd.DataFrame(data_rows)
+            pollutant_cleaned = pollutant.replace(' ', '').replace('/', '')
+            csv_path = os.path.join(
+                self.output_dir, 
+                f"{place}_{pollutant_cleaned}.csv"
+            )
             df.to_csv(csv_path, index=False)
             print(f"Saved {pollutant} data to {csv_path}")
 
         return float(loss), len(X_test), {"mae": float(mae)}
 
+
+##############################################################################
+# 3) Preprocessing Function                                                  #
+##############################################################################
 def preprocess_data(dataset_path):
     """
     1. Load the CSV
@@ -112,8 +169,7 @@ def preprocess_data(dataset_path):
     3. Drop NaNs
     4. Scale data
     5. Split into train/test
-    6. Reshape for input to (batch, 1, 7) so LSTM has time dimension = 1
-    7. Return dictionary with train/test/scaler
+    6. Reshape for input to (batch, 1, 7)
     """
     df = pd.read_csv(dataset_path)
     pollutants = [
@@ -126,15 +182,11 @@ def preprocess_data(dataset_path):
         "Ozone (µg/m³)"
     ]
 
-    # Keep only relevant columns
     df = df[["Timestamp"] + pollutants].dropna()
-
-    # Convert Timestamp to datetime, set as index (optional but typical for timeseries)
     df["Timestamp"] = pd.to_datetime(df["Timestamp"])
     df = df.set_index("Timestamp")
 
-    values = df.values  # shape (num_samples, 7)
-
+    values = df.values
     scaler = MinMaxScaler()
     values_scaled = scaler.fit_transform(values)
 
@@ -142,15 +194,22 @@ def preprocess_data(dataset_path):
     train_data = values_scaled[:train_size]
     test_data = values_scaled[train_size:]
 
-    # We predict the next step from the current step
     X_train, y_train = train_data[:-1], train_data[1:]
     X_test, y_test = test_data[:-1], test_data[1:]
 
     X_train = np.expand_dims(X_train, axis=1)
     X_test = np.expand_dims(X_test, axis=1)
 
-    return {"train": (X_train, y_train), "test": (X_test, y_test), "scaler": scaler}, X_train.shape[-1]
+    return {
+        "train": (X_train, y_train),
+        "test": (X_test, y_test),
+        "scaler": scaler
+    }, X_train.shape[-1]
 
+
+##############################################################################
+# 4) Main: Start the FL Client                                              #
+##############################################################################
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -177,8 +236,21 @@ def main():
 
     data, input_dim = preprocess_data(args.dataset)
 
-    client = TimeSeriesClient(data=data, input_dim=input_dim, learning_rate=learning_rate, epochs=epochs, batch_size=batch_size, output_dir=output_dir, dataset_path=args.dataset)
-    fl.client.start_numpy_client(server_address="127.0.0.1:8080", client=client)
+    client = TimeSeriesClient(
+        data=data,
+        input_dim=input_dim,
+        learning_rate=learning_rate,
+        epochs=epochs,
+        batch_size=batch_size,
+        output_dir=output_dir,
+        dataset_path=args.dataset
+    )
+
+    fl.client.start_numpy_client(
+        server_address="127.0.0.1:8080",
+        client=client
+    )
+
 
 if __name__ == "__main__":
     main()
