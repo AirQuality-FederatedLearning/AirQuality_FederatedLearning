@@ -70,7 +70,8 @@ class SaveModelFedAvg(FedAvg):
         model = build_hybrid_mlp_lstm(input_dim=7, learning_rate=0.001)
         model.set_weights(weights)
         return model
-
+#####
+#
 
 ###############################################################################
 # 3) Main: Start the FL Server                                               #
