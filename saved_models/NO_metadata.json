@@ -1,0 +1,14 @@
+{
+    "pollutant": "NO (\u00b5g/m\u00b3)",
+    "clean_name": "NO",
+    "mlp_layers": [
+        256,
+        128
+    ],
+    "lstm_layers": 1,
+    "lstm_units": 256,
+    "bidirectional": true,
+    "mse": 0.00010639828542480245,
+    "mae": 0.004642503801733255,
+    "timestamp": "2025-02-27T13:10:02.674778"
+}

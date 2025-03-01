@@ -1,0 +1,15 @@
+{
+    "pollutant": "NO2 (\u00b5g/m\u00b3)",
+    "clean_name": "NO2",
+    "mlp_layers": [
+        128,
+        64,
+        32
+    ],
+    "lstm_layers": 1,
+    "lstm_units": 64,
+    "bidirectional": true,
+    "mse": 0.0002909669710788876,
+    "mae": 0.010896949097514153,
+    "timestamp": "2025-02-27T13:10:33.385065"
+}

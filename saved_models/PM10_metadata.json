@@ -1,0 +1,13 @@
+{
+    "pollutant": "PM10 (\u00b5g/m\u00b3)",
+    "clean_name": "PM10",
+    "mlp_layers": [
+        128
+    ],
+    "lstm_layers": 2,
+    "lstm_units": 64,
+    "bidirectional": false,
+    "mse": 0.0005821658996865153,
+    "mae": 0.011698256246745586,
+    "timestamp": "2025-02-27T13:09:22.087930"
+}

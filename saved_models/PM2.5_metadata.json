@@ -1,0 +1,13 @@
+{
+    "pollutant": "PM2.5 (\u00b5g/m\u00b3)",
+    "clean_name": "PM2.5",
+    "mlp_layers": [
+        128
+    ],
+    "lstm_layers": 2,
+    "lstm_units": 64,
+    "bidirectional": false,
+    "mse": 0.0004432376299519092,
+    "mae": 0.010765694081783295,
+    "timestamp": "2025-02-27T13:08:56.102229"
+}

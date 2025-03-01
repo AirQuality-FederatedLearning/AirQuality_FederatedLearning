@@ -1,0 +1,13 @@
+{
+    "pollutant": "Ozone (\u00b5g/m\u00b3)",
+    "clean_name": "Ozone",
+    "mlp_layers": [
+        128
+    ],
+    "lstm_layers": 2,
+    "lstm_units": 64,
+    "bidirectional": false,
+    "mse": 0.0009125143988057971,
+    "mae": 0.014689247123897076,
+    "timestamp": "2025-02-27T13:12:57.016136"
+}

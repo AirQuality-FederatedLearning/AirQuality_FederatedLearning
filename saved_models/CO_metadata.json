@@ -1,0 +1,13 @@
+{
+    "pollutant": "CO (mg/m\u00b3)",
+    "clean_name": "CO",
+    "mlp_layers": [
+        128
+    ],
+    "lstm_layers": 2,
+    "lstm_units": 64,
+    "bidirectional": false,
+    "mse": 0.00020344163931440562,
+    "mae": 0.008996184915304184,
+    "timestamp": "2025-02-27T13:12:12.671826"
+}
